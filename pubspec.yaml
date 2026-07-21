@@ -1,0 +1,27 @@
+name: rehlaty_mobile
+description: واجهة تطبيق رحلاتي للعملاء (UI/UX) - مسؤولية Person 5
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+  google_fonts: ^6.2.1
+  intl: ^0.20.0
+  shimmer: ^3.0.0
+  shared_preferences: ^2.2.3
+  http: ^1.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
