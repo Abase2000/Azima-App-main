@@ -1,9 +1,20 @@
 import 'dart:async';
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import '../models/user.dart';
 import '../models/flight.dart';
 import '../models/hotel.dart';
 import '../models/booking_record.dart';
 import '../data/mock_data.dart';
+import 'session_service.dart';
+
+class ChatResponse {
+  final String reply;
+  final int? conversationId;
+
+  ChatResponse({required this.reply, this.conversationId});
+}
 
 /// =====================================================================
 /// طبقة الاتصال بالـ API — مسؤولية التكامل فقط (بدون منطق Backend).
@@ -16,16 +27,40 @@ import '../data/mock_data.dart';
 /// عنوان الخادم الأساسي يوضع هنا مرة واحدة فقط.
 /// =====================================================================
 class ApiService {
-  static const String baseUrl = 'http://10.0.2.2:5000'; // TODO: عدّله حسب بيئة التشغيل
+  static const String baseUrl = kIsWeb ? 'http://localhost:8000' : 'http://10.0.2.2:8000';
 
   // ------------------ Auth (Person 1) ------------------
   // TODO: POST $baseUrl/api/login  { email, password } -> { success, user, token }
   static Future<Map<String, dynamic>> login({required String email, required String password}) async {
-    await Future.delayed(const Duration(milliseconds: 700));
-    return {
-      'success': true,
-      'user': AppUser(id: 'U1', name: 'محمد أحمد', email: email, phone: '+20 100 000 0000').toJson(),
-    };
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/login'),
+        headers: {'Content-Type': 'application/json; charset=utf-8'},
+        body: jsonEncode({'email': email, 'password': password}),
+      );
+
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 && data['success'] == true) {
+        final token = data['data']['access_token'];
+        if (token != null) {
+          await SessionService.saveToken(token);
+        }
+        return {
+          'success': true,
+          'user': data['data']['user'],
+        };
+      } else {
+        return {
+          'success': false,
+          'message': data['message'] ?? 'فشل تسجيل الدخول',
+        };
+      }
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'حدث خطأ في الاتصال بالخادم: $e',
+      };
+    }
   }
 
   // TODO: POST $baseUrl/api/register { name, email, phone, password } -> { success, user, token }
@@ -106,21 +141,68 @@ class ApiService {
 
   // ------------------ AI Support Chat (Person 6) ------------------
   // TODO(Person 6): POST $baseUrl/api/chat { message, user_id, session_id }
-  // من المتوقع أن يعيد Backend الذكاء الاصطناعي حقل "reply" بالرد النصي،
-  // وقد يضيف لاحقًا حقل "suggestions" لاقتراحات ذكية (مثال: توصية فندق/رحلة).
-  static Future<String> sendChatMessage({
+  static Future<ChatResponse> sendChatMessage({
     required String message,
     String? userId,
-    String? sessionId,
+    int? conversationId,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 900));
-    // رد وهمي مؤقت لعرض الواجهة قبل تكامل الذكاء الاصطناعي الحقيقي
-    if (message.contains('حجز') || message.contains('إلغاء')) {
-      return 'يمكنك مراجعة وإلغاء حجوزاتك من قسم "حجوزاتي" في التطبيق. هل تريد مساعدة في حجز معين؟';
+    try {
+      final token = await SessionService.getToken();
+      final headers = <String, String>{
+        'Content-Type': 'application/json; charset=utf-8',
+      };
+      if (token != null) {
+        headers['Authorization'] = 'Bearer $token';
+      }
+
+      final bodyMap = <String, dynamic>{
+        'message': message,
+      };
+      if (conversationId != null) {
+        bodyMap['conversation_id'] = conversationId;
+      }
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/chat'),
+        headers: headers,
+        body: jsonEncode(bodyMap),
+      );
+
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 && data['success'] == true) {
+        final replyText = data['data']['ai_response']['content'];
+        final convId = data['data']['conversation_id'];
+        return ChatResponse(reply: replyText, conversationId: convId);
+      } else {
+        return ChatResponse(reply: data['message'] ?? 'فشل الحصول على رد من المساعد.');
+      }
+    } catch (e) {
+      return ChatResponse(reply: 'حدث خطأ في الاتصال بالخادم: $e');
     }
-    if (message.contains('دفع') || message.contains('فلوس') || message.contains('سعر')) {
-      return 'نوفر الدفع عبر البطاقات الائتمانية، المحافظ الإلكترونية، أو الدفع عند الوصول. هل تواجه مشكلة في عملية دفع معينة؟';
+  }
+
+  static Future<List<Map<String, dynamic>>> getChatHistory() async {
+    try {
+      final token = await SessionService.getToken();
+      final headers = <String, String>{
+        'Content-Type': 'application/json; charset=utf-8',
+      };
+      if (token != null) {
+        headers['Authorization'] = 'Bearer $token';
+      }
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/chat-history'),
+        headers: headers,
+      );
+
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 && data['success'] == true) {
+        return List<Map<String, dynamic>>.from(data['data']);
+      }
+    } catch (e) {
+      print('Error fetching chat history: $e');
     }
-    return 'شكرًا لتواصلك! هذا رد تجريبي حاليًا — سيتم ربط هذه الشاشة بخدمة الذكاء الاصطناعي الحقيقية من فريق الدعم قريبًا.';
+    return [];
   }
 }

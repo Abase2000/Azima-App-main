@@ -4,6 +4,7 @@ import '../models/user.dart';
 
 class SessionService {
   static const _keyUser = 'current_user';
+  static const _keyToken = 'access_token';
 
   static Future<void> saveUser(AppUser user) async {
     final prefs = await SharedPreferences.getInstance();
@@ -17,6 +18,16 @@ class SessionService {
     return AppUser.fromJson(jsonDecode(raw));
   }
 
+  static Future<void> saveToken(String token) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyToken, token);
+  }
+
+  static Future<String?> getToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyToken);
+  }
+
   static Future<bool> isLoggedIn() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_keyUser) != null;
@@ -25,5 +36,6 @@ class SessionService {
   static Future<void> clear() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_keyUser);
+    await prefs.remove(_keyToken);
   }
 }

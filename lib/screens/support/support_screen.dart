@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../services/session_service.dart';
@@ -23,6 +24,7 @@ class _SupportScreenState extends State<SupportScreen> {
   final _scrollController = ScrollController();
   final List<ChatMessage> _messages = [];
   bool _isTyping = false;
+  int? _conversationId;
 
   final List<String> _quickQuestions = [
     'كيف ألغي حجزي؟',
@@ -39,6 +41,51 @@ class _SupportScreenState extends State<SupportScreen> {
       false,
       DateTime.now(),
     ));
+    _loadHistory();
+  }
+
+  Future<void> _loadHistory() async {
+    setState(() => _isTyping = true);
+    try {
+      final history = await ApiService.getChatHistory();
+      if (history.isNotEmpty) {
+        final activeConv = history.first;
+        final conversationId = activeConv['id'] as int;
+        
+        final List<dynamic> msgs = activeConv['messages'] is String 
+            ? jsonDecode(activeConv['messages']) 
+            : activeConv['messages'];
+        final List<ChatMessage> loadedMessages = [];
+        
+        for (var m in msgs) {
+          final content = m['content'] as String;
+          final role = m['role'] as String;
+          final isUser = role == 'user';
+          
+          DateTime time = DateTime.now();
+          if (m['timestamp'] != null) {
+            try {
+              time = DateTime.parse(m['timestamp']);
+            } catch (_) {}
+          }
+          loadedMessages.add(ChatMessage(content, isUser, time));
+        }
+        
+        if (!mounted) return;
+        setState(() {
+          _conversationId = conversationId;
+          _messages.clear();
+          _messages.addAll(loadedMessages);
+        });
+        _scrollToBottom();
+      }
+    } catch (e) {
+      print('Failed to load chat history: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isTyping = false);
+      }
+    }
   }
 
   String _formatTime(DateTime t) =>
@@ -70,12 +117,16 @@ class _SupportScreenState extends State<SupportScreen> {
     _scrollToBottom();
 
     try {
-      // TODO(Person 6): هذا الاستدعاء سيتصل بخدمة الذكاء الاصطناعي الحقيقية عند جاهزيتها
-      final reply = await ApiService.sendChatMessage(message: text, userId: user?.id);
+      final response = await ApiService.sendChatMessage(
+        message: text,
+        userId: user?.id,
+        conversationId: _conversationId,
+      );
       if (!mounted) return;
       setState(() {
         _isTyping = false;
-        _messages.add(ChatMessage(reply, false, DateTime.now()));
+        _messages.add(ChatMessage(response.reply, false, DateTime.now()));
+        _conversationId = response.conversationId;
       });
     } catch (e) {
       if (!mounted) return;
@@ -123,6 +174,7 @@ class _SupportScreenState extends State<SupportScreen> {
             onPressed: () {
               setState(() {
                 _messages.clear();
+                _conversationId = null;
                 _messages.add(ChatMessage(
                   'مرحبًا من جديد! كيف أقدر أساعدك؟ 😊',
                   false,
