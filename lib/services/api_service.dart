@@ -83,10 +83,36 @@ class ApiService {
     return true;
   }
 
-  // TODO: PUT $baseUrl/api/users/me { name, phone, avatar }
+  // TODO: PUT $baseUrl/api/profile { name, phone }
   static Future<bool> updateProfile(AppUser user) async {
-    await Future.delayed(const Duration(milliseconds: 600));
-    return true;
+    try {
+      final token = await SessionService.getToken();
+      final headers = <String, String>{
+        'Content-Type': 'application/json; charset=utf-8',
+      };
+      if (token != null) {
+        headers['Authorization'] = 'Bearer $token';
+      }
+
+      final response = await http.put(
+        Uri.parse('$baseUrl/api/profile'),
+        headers: headers,
+        body: jsonEncode({
+          'name': user.name,
+          'phone': user.phone,
+        }),
+      );
+
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 && data['success'] == true) {
+        return true;
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error updating profile: $e');
+      }
+    }
+    return false;
   }
 
   // ------------------ Flights (Person 2) ------------------

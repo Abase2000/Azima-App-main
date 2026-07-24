@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/user.dart';
 import '../../services/session_service.dart';
+import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/primary_button.dart';
@@ -58,9 +59,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onPressed: () async {
                 if (_user != null) {
                   final updated = AppUser(id: _user!.id, name: nameCtrl.text, email: _user!.email, phone: phoneCtrl.text);
-                  // TODO(Person 1): استبدل هذا باستدعاء ApiService.updateProfile الحقيقي
-                  await SessionService.saveUser(updated);
-                  setState(() => _user = updated);
+                  
+                  final success = await ApiService.updateProfile(updated);
+                  if (success) {
+                    await SessionService.saveUser(updated);
+                    setState(() => _user = updated);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('تم حفظ التغييرات بنجاح 🌟')),
+                      );
+                    }
+                  } else {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('فشل حفظ التغييرات، يرجى التحقق من المدخلات'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  }
                 }
                 if (mounted) Navigator.pop(ctx);
               },
