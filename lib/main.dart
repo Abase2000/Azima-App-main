@@ -31,10 +31,37 @@ class RehlatyMobileApp extends StatelessWidget {
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.light,
       // اتجاه التطبيق
+      // اتجاه التطبيق مع دعم التجاوب لجميع أحجام الشاشات
       builder: (context, child) {
         return Directionality(
           textDirection: TextDirection.rtl,
-          child: child!,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              if (constraints.maxWidth > 500) {
+                return Container(
+                  color: const Color(0xFFF3F4F6), // خلفية ناعمة للشاشات الكبيرة
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 500),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.08),
+                              blurRadius: 24,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: child!,
+                      ),
+                    ),
+                  ),
+                );
+              }
+              return child!;
+            },
+          ),
         );
       },
       // الشاشة الأولى
